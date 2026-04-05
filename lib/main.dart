@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'register_screen.dart';
+import 'dashboard.dart';
 
 // ─────────────────────────────────────────────
 //  ENTRY POINT
@@ -110,6 +111,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   // ── Firebase Login ──────────────────────────
+// ── Firebase Login ──────────────────────────
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -123,8 +125,15 @@ class _LoginScreenState extends State<LoginScreen>
         email:    _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      // TODO: Navigate to Home Dashboard on success
-      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+
+      // ✅ HERE IS YOUR NEW NAVIGATION CODE ✅
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainNavigationPage()),
+        );
+      }
+
     } on FirebaseAuthException catch (e) {
       setState(() {
         _errorMessage = _mapFirebaseError(e.code);

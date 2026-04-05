@@ -1,3 +1,4 @@
+import 'dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -109,12 +110,13 @@ class _RegisterScreenState extends State<RegisterScreen>
       });
 
       // TODO: Navigate to Home Dashboard
-      // if (mounted) {
-      //   Navigator.pushReplacement(
-      //     context,
-      //     MaterialPageRoute(builder: (_) => const HomeScreen()),
-      //   );
-      // }
+      // Send the user directly to the app
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigationPage()),
+        );
+      }
 
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _mapFirebaseError(e.code));
