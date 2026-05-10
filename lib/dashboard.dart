@@ -1806,6 +1806,31 @@ class InteractiveMasterGraph extends StatefulWidget {
 class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
   String selectedMetric = 'light_lux';
 
+  // 1. THE NEW PREDICTION FUNCTION
+  String calculateTimeUntilWatering({
+    required double previousMoisture,
+    required double currentMoisture,
+    required double hoursElapsed,
+    required double minThreshold
+  }) {
+    if (currentMoisture >= previousMoisture) {
+      return "Soil is wet. No watering needed soon.";
+    }
+
+    double moistureLossRate = (previousMoisture - currentMoisture) / hoursElapsed;
+    if (moistureLossRate <= 0) return "Calculating...";
+
+    double timeUntilWatering = (currentMoisture - minThreshold) / moistureLossRate;
+
+    if (timeUntilWatering <= 0) {
+      return "Water Immediately!";
+    } else if (timeUntilWatering < 1) {
+      return "Water in less than an hour";
+    } else {
+      return "Water in roughly ${timeUntilWatering.toStringAsFixed(1)} hours";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     var sortedKeys = widget.historyData.keys.toList()..sort();
@@ -1824,13 +1849,11 @@ class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
       index++;
     }
 
-    // NEW: Calculate Exact Stats for the Bottom Row
     double exactMin = spots.isEmpty ? 0 : spots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
     double exactMax = spots.isEmpty ? 0 : spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
     double sum = spots.isEmpty ? 0 : spots.map((e) => e.y).reduce((a, b) => a + b);
     double avg = spots.isEmpty ? 0 : sum / spots.length;
 
-    // Graph Y-Axis Scaling logic
     double minY = exactMin;
     double maxY = exactMax;
     if (minY == maxY) {
@@ -1863,6 +1886,25 @@ class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
         graphTitle = 'Light Intensity (Lux)';
     }
 
+    // 2. CALCULATE THE PREDICTION (Only if Soil Moisture is selected and we have enough data)
+    String predictionText = "";
+    if (selectedMetric == 'soil_moisture_percent' && spots.length > 1) {
+      double currentMoisture = spots.last.y;
+      double previousMoisture = spots.first.y; // Comparing oldest visible point to newest
+
+      // Calculate how many hours are currently shown on the graph
+      double timeIntervalSecs = (timestamps.last - timestamps.first).toDouble();
+      double hoursElapsed = timeIntervalSecs / 3600.0;
+
+      // Run the math! (Assuming 20% is the danger zone threshold)
+      predictionText = calculateTimeUntilWatering(
+        previousMoisture: previousMoisture,
+        currentMoisture: currentMoisture,
+        hoursElapsed: hoursElapsed > 0 ? hoursElapsed : 1, // Prevent division by zero
+        minThreshold: 20.0,
+      );
+    }
+
     return Column(
       children: [
         SingleChildScrollView(
@@ -1879,8 +1921,10 @@ class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
           ),
         ),
         const SizedBox(height: 20),
+
+        // The Main Graph Card
         Container(
-          height: 350, // Increased height to make room for the bottom text
+          height: 350,
           margin: const EdgeInsets.symmetric(horizontal: 14),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1931,13 +1975,9 @@ class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
                           reservedSize: 30,
                           interval: spots.length > 4 ? (spots.length / 4).ceilToDouble() : 1,
                           getTitlesWidget: (value, meta) {
-                            if (value % meta.appliedInterval != 0) {
-                              return const SizedBox.shrink();
-                            }
+                            if (value % meta.appliedInterval != 0) return const SizedBox.shrink();
                             int idx = value.toInt();
-                            if (idx < 0 || idx >= timestamps.length || timestamps[idx] == 0) {
-                              return const SizedBox.shrink();
-                            }
+                            if (idx < 0 || idx >= timestamps.length || timestamps[idx] == 0) return const SizedBox.shrink();
                             DateTime time = DateTime.fromMillisecondsSinceEpoch(timestamps[idx] * 1000);
                             String hour = time.hour.toString().padLeft(2, '0');
                             String min = time.minute.toString().padLeft(2, '0');
@@ -2000,9 +2040,8 @@ class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
                   curve: Curves.easeInOut,
                 ),
               ),
-              const SizedBox(height: 12), // Spacer below the graph
+              const SizedBox(height: 12),
 
-              // NEW: The Summary Stats Row!
               Container(
                 padding: const EdgeInsets.only(top: 12),
                 decoration: BoxDecoration(
@@ -2020,30 +2059,64 @@ class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
             ],
           ),
         ),
+
+        // 3. THE SMART PREDICTION UI BOX
+        // This box only appears if the user has selected "Soil Hum"
+        if (selectedMetric == 'soil_moisture_percent' && predictionText.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 16, left: 14, right: 14),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.auto_awesome, color: Colors.blue.shade700),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "AI Watering Prediction",
+                        style: TextStyle(
+                          color: Colors.blue.shade900,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        predictionText,
+                        style: TextStyle(
+                          color: Colors.blue.shade800,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
 
-  // Helper widget to build the individual text blocks for Min/Avg/Max
   Widget _buildStatItem(String label, String value, Color valueColor) {
     return Column(
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.grey,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
+          style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(
-            color: valueColor, // Matches the color of the graph line!
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(color: valueColor, fontSize: 18, fontWeight: FontWeight.w800),
         ),
       ],
     );
