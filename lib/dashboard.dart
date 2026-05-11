@@ -244,6 +244,18 @@ class HomePage extends StatelessWidget {
           'Zr3ahTech',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_active_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: StreamBuilder<DatabaseEvent>(
         stream: userPlantsRef.onValue,
@@ -914,6 +926,161 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool notifications = true;
 
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [Icon(Icons.help_outline, color: Colors.blue), SizedBox(width: 8), Text('Help Center')],
+        ),
+        content: const Text('To use Zr3ahTech, simply add your plant via the "+" button, enter the pot size, and ensure your hardware sensors are active. The dashboard will automatically calculate the health score and water needed based on ideal plant profiles.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Got it', style: TextStyle(color: kGreen)))],
+      ),
+    );
+  }
+
+  void _showAboutUsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [Icon(Icons.info_outline, color: Colors.green), SizedBox(width: 8), Text('About Us')],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('Zr3ahTech was developed by:', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 12),
+            Text('• Naif Alshamrani'),
+            Text('• Abdullah Alajmi'),
+            SizedBox(height: 12),
+            Text('Version: 1.0.0\nMade for smart agriculture monitoring.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close', style: TextStyle(color: kGreen)))],
+      ),
+    );
+  }
+
+  void _showContactUsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [Icon(Icons.mail_outline, color: Colors.purple), SizedBox(width: 8), Text('Contact Us')],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('For support or business inquiries, please reach out to us at:'),
+            SizedBox(height: 16),
+            Text('Naif Alshamrani:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text('nkhalafalshamrani@stu.kau.edu.sa', style: TextStyle(color: Colors.blue)),
+            SizedBox(height: 12),
+            Text('Abdullah Alajmi:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text('gg@gmail.com', style: TextStyle(color: Colors.blue)),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close', style: TextStyle(color: kGreen)))],
+      ),
+    );
+  }
+
+  void _showFeedbackDialog() {
+    final TextEditingController feedbackController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isSubmitting = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: const Row(
+                children: [
+                  Icon(Icons.feedback_outlined, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Send Feedback'),
+                ],
+              ),
+              content: TextField(
+                controller: feedbackController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'Tell us how we can improve...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: kGreen, width: 2),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kGreen,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                    final text = feedbackController.text.trim();
+                    if (text.isEmpty) return;
+
+                    setDialogState(() => isSubmitting = true);
+
+                    try {
+                      final user = FirebaseAuth.instance.currentUser;
+
+                      // 👇 THIS IS WHERE THE MAGIC HAPPENS 👇
+                      // It creates a new folder in your database called 'feedbacks'
+                      await rtdb.ref('feedbacks').push().set({
+                        'uid': user?.uid ?? 'anonymous',
+                        'email': user?.email ?? 'unknown',
+                        'message': text,
+                        'timestamp': ServerValue.timestamp,
+                      });
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Feedback sent! Thank you.')),
+                        );
+                      }
+                    } catch (e) {
+                      setDialogState(() => isSubmitting = false);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Failed to send feedback. Try again.')),
+                        );
+                      }
+                    }
+                  },
+                  child: isSubmitting
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                      : const Text('Submit', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -929,48 +1096,39 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           children: [
             Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
               child: SwitchListTile(
-                title: const Text(
-                  'Push Notifications (Recommended)',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                secondary: const Icon(
-                  Icons.notifications_active_rounded,
-                  color: Color(0xFFFF9800),
-                ),
+                title: const Text('Push Notifications (Recommended)', style: TextStyle(fontWeight: FontWeight.w600)),
+                secondary: const Icon(Icons.notifications_active_rounded, color: Color(0xFFFF9800)),
                 value: notifications,
                 activeColor: kGreen,
-                onChanged: (value) {
-                  setState(() {
-                    notifications = value;
-                  });
-                },
+                onChanged: (value) => setState(() => notifications = value),
               ),
             ),
             const SizedBox(height: 16),
-            const SettingsTile(
+            SettingsTile(
               title: 'Help',
               icon: Icons.help_outline_rounded,
               iconColor: Colors.blue,
+              onTap: _showHelpDialog,
             ),
-            const SettingsTile(
+            SettingsTile(
               title: 'About Us',
               icon: Icons.info_outline_rounded,
               iconColor: Colors.green,
+              onTap: _showAboutUsDialog,
             ),
-            const SettingsTile(
+            SettingsTile(
               title: 'Send Feedback',
               icon: Icons.feedback_outlined,
               iconColor: Colors.orange,
+              onTap: _showFeedbackDialog,
             ),
-            const SettingsTile(
+            SettingsTile(
               title: 'Contact Us',
               icon: Icons.mail_outline_rounded,
               iconColor: Colors.purple,
+              onTap: _showContactUsDialog,
             ),
             const Spacer(),
             SizedBox(
@@ -978,30 +1136,16 @@ class _SettingsPageState extends State<SettingsPage> {
               child: ElevatedButton(
                 onPressed: () async {
                   await FirebaseAuth.instance.signOut();
-
                   if (context.mounted) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                    );
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
                   }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kGreen,
                   padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                child: const Text(
-                  'Sign Out',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: const Text('Sign Out', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -1015,12 +1159,14 @@ class SettingsTile extends StatefulWidget {
   final String title;
   final IconData icon;
   final Color iconColor;
+  final VoidCallback? onTap; // Added onTap
 
   const SettingsTile({
     super.key,
     required this.title,
     required this.icon,
     required this.iconColor,
+    this.onTap, // Added onTap
   });
 
   @override
@@ -1033,16 +1179,8 @@ class _SettingsTileState extends State<SettingsTile> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) {
-        setState(() {
-          isHovering = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          isHovering = false;
-        });
-      },
+      onEnter: (_) => setState(() => isHovering = true),
+      onExit: (_) => setState(() => isHovering = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 10),
@@ -1055,6 +1193,7 @@ class _SettingsTileState extends State<SettingsTile> {
           ),
         ),
         child: ListTile(
+          onTap: widget.onTap, // Trigger the tap
           leading: Icon(widget.icon, color: widget.iconColor),
           title: Text(
             widget.title,
@@ -2145,6 +2284,175 @@ class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
             selectedMetric = metricKey;
           });
         },
+      ),
+    );
+  }
+}
+// ─────────────────────────────────────────────
+//  NOTIFICATIONS SCREEN
+// ─────────────────────────────────────────────
+class NotificationsScreen extends StatelessWidget {
+  const NotificationsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return const Scaffold(body: Center(child: Text('Please log in')));
+
+    return Scaffold(
+      backgroundColor: kBackground,
+      appBar: AppBar(
+        backgroundColor: kPrimary,
+        foregroundColor: Colors.white,
+        title: const Text('Notifications'),
+        centerTitle: true,
+      ),
+      body: StreamBuilder<DatabaseEvent>(
+        // 1. Get User Plants
+        stream: rtdb.ref('user_plants/${user.uid}').onValue,
+        builder: (context, userPlantsSnapshot) {
+          if (!userPlantsSnapshot.hasData || userPlantsSnapshot.data?.snapshot.value == null) {
+            return const Center(child: Text('No alerts at this time.'));
+          }
+
+          final userPlants = Map<dynamic, dynamic>.from(userPlantsSnapshot.data!.snapshot.value as Map);
+
+          return StreamBuilder<DatabaseEvent>(
+            // 2. Get Live Sensor Data
+            stream: rtdb.ref('sensor_data').onValue,
+            builder: (context, sensorSnapshot) {
+              if (!sensorSnapshot.hasData || sensorSnapshot.data?.snapshot.value == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final sensorData = Map<dynamic, dynamic>.from(sensorSnapshot.data!.snapshot.value as Map);
+
+              return StreamBuilder<DatabaseEvent>(
+                // 3. Get Plant Library thresholds
+                stream: rtdb.ref('plant_library/plant_library').onValue,
+                builder: (context, librarySnapshot) {
+                  if (!librarySnapshot.hasData || librarySnapshot.data?.snapshot.value == null) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final libraryData = Map<dynamic, dynamic>.from(librarySnapshot.data!.snapshot.value as Map);
+                  List<Widget> activeAlerts = [];
+
+                  // 4. Logic to check for out-of-bounds metrics
+                  userPlants.forEach((key, plantValue) {
+                    final plant = Map<String, dynamic>.from(plantValue as Map);
+                    final plantKey = plant['plant_key']?.toString() ?? '';
+                    final plantName = plant['plant_name']?.toString() ?? 'Your Plant';
+                    final potSize = _asDouble(plant['pot_size']);
+                    final soilRatio = _asDouble(plant['soil_volume_ratio']);
+
+                    if (libraryData.containsKey(plantKey)) {
+                      final profile = Map<String, dynamic>.from(libraryData[plantKey] as Map);
+
+                      // Check Soil Moisture (The main request)
+                      double currentMoisture = _asDouble(sensorData['soil_moisture_percent']);
+                      double minMoisture = _asDouble(profile['ideal_soil_moisture_min']);
+                      double maxMoisture = _asDouble(profile['ideal_soil_moisture_max']);
+
+                      if (currentMoisture < minMoisture) {
+                        // Calculate water needed using your existing top-level function
+                        double targetMoisture = (minMoisture + maxMoisture) / 2;
+                        double waterNeeded = _calculateWaterNeedMl(
+                          targetMoisture: targetMoisture,
+                          currentMoisture: currentMoisture,
+                          potSize: potSize,
+                          soilRatioPercent: soilRatio == 0 ? 80 : soilRatio,
+                        );
+
+                        activeAlerts.add(_buildAlertCard(
+                          title: 'Water Needed: $plantName',
+                          message: 'Moisture is below ideal range ($minMoisture%). Add ${waterNeeded.toStringAsFixed(0)} ml of water.',
+                          icon: Icons.water_drop,
+                          color: Colors.blue,
+                          time: 'Just now',
+                        ));
+                      }
+
+                      // Check Temp (Optional extra feature, just an example)
+                      double currentTemp = _asDouble(sensorData['air_temp_c']);
+                      double maxTemp = _asDouble(profile['ideal_air_temp_max']);
+                      if (currentTemp > maxTemp) {
+                        activeAlerts.add(_buildAlertCard(
+                          title: 'Temperature Warning: $plantName',
+                          message: 'Air temperature (${currentTemp.toStringAsFixed(1)}°C) is too hot for this plant!',
+                          icon: Icons.thermostat,
+                          color: Colors.redAccent,
+                          time: 'Just now',
+                        ));
+                      }
+                    }
+                  });
+
+                  if (activeAlerts.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline, size: 60, color: Colors.green.shade300),
+                          const SizedBox(height: 16),
+                          const Text('All plants are perfectly healthy!', style: TextStyle(fontSize: 16, color: Colors.black54)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: activeAlerts,
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAlertCard({required String title, required String message, required IconData icon, required Color color, required String time}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border(left: BorderSide(color: color, width: 4)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
+                    Text(time, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(message, style: const TextStyle(color: Colors.black87, fontSize: 13, height: 1.4)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
