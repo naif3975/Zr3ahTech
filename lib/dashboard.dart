@@ -1,10 +1,9 @@
-
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:typed_data';
-import 'package:image_picker/image_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import 'firebase_options.dart';
@@ -508,9 +507,6 @@ class _AddPlantPageState extends State<AddPlantPage> {
   bool isLoadingPlants = true;
   bool isSaving = false;
 
-  Uint8List? selectedImageBytes;
-  String? selectedImageName;
-
   @override
   void initState() {
     super.initState();
@@ -548,31 +544,6 @@ class _AddPlantPageState extends State<AddPlantPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to load plants: $e')));
-      }
-    }
-  }
-
-  Future<void> _pickImage() async {
-    try {
-      final picker = ImagePicker();
-      final XFile? file = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-      );
-
-      if (file == null) return;
-
-      final bytes = await file.readAsBytes();
-
-      setState(() {
-        selectedImageBytes = bytes;
-        selectedImageName = file.name;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
       }
     }
   }
@@ -652,8 +623,6 @@ class _AddPlantPageState extends State<AddPlantPage> {
 
         setState(() {
           selectedPlantKey = null;
-          selectedImageBytes = null;
-          selectedImageName = null;
         });
       }
     } catch (e) {
@@ -831,51 +800,6 @@ class _AddPlantPageState extends State<AddPlantPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 18),
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: 190,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.black12),
-                ),
-                child:
-                selectedImageBytes != null
-                    ? ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Image.memory(
-                    selectedImageBytes!,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                  ),
-                )
-                    : const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.add_a_photo_outlined,
-                      size: 58,
-                      color: Color(0xFF43A047),
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      'Upload Plant Image',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (selectedImageName != null)
-              Text(
-                selectedImageName!,
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
-              ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -924,8 +848,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool notifications = true;
-
   void _showHelpDialog() {
     showDialog(
       context: context,
@@ -980,7 +902,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Text('nkhalafalshamrani@stu.kau.edu.sa', style: TextStyle(color: Colors.blue)),
             SizedBox(height: 12),
             Text('Abdullah Alajmi:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            Text('gg@gmail.com', style: TextStyle(color: Colors.blue)),
+            Text('asalehalajmi0001@stu.kau.edu.sa', style: TextStyle(color: Colors.blue)),
           ],
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close', style: TextStyle(color: kGreen)))],
@@ -1041,7 +963,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     try {
                       final user = FirebaseAuth.instance.currentUser;
 
-                      // 👇 THIS IS WHERE THE MAGIC HAPPENS 👇
+
                       // It creates a new folder in your database called 'feedbacks'
                       await rtdb.ref('feedbacks').push().set({
                         'uid': user?.uid ?? 'anonymous',
@@ -1095,17 +1017,6 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Container(
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-              child: SwitchListTile(
-                title: const Text('Push Notifications (Recommended)', style: TextStyle(fontWeight: FontWeight.w600)),
-                secondary: const Icon(Icons.notifications_active_rounded, color: Color(0xFFFF9800)),
-                value: notifications,
-                activeColor: kGreen,
-                onChanged: (value) => setState(() => notifications = value),
-              ),
-            ),
-            const SizedBox(height: 16),
             SettingsTile(
               title: 'Help',
               icon: Icons.help_outline_rounded,
@@ -1130,7 +1041,7 @@ class _SettingsPageState extends State<SettingsPage> {
               iconColor: Colors.purple,
               onTap: _showContactUsDialog,
             ),
-            const Spacer(),
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -2291,8 +2202,57 @@ class _InteractiveMasterGraphState extends State<InteractiveMasterGraph> {
 // ─────────────────────────────────────────────
 //  NOTIFICATIONS SCREEN
 // ─────────────────────────────────────────────
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  // Stores the first time each alert key was detected (persists across rebuilds)
+  final Map<String, DateTime> _alertFirstSeen = {};
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    // Refresh the displayed relative times every 30 seconds
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  /// Returns a human-readable relative time string.
+  String _relativeTime(DateTime since) {
+    final diff = DateTime.now().difference(since);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) {
+      final h = diff.inHours;
+      return '$h ${h == 1 ? 'hr' : 'hrs'} ago';
+    }
+    final d = diff.inDays;
+    return '$d ${d == 1 ? 'day' : 'days'} ago';
+  }
+
+  /// Records the first time an alert with [alertKey] was detected.
+  /// If it was already seen before, the original timestamp is kept.
+  DateTime _recordAlert(String alertKey) {
+    _alertFirstSeen.putIfAbsent(alertKey, () => DateTime.now());
+    return _alertFirstSeen[alertKey]!;
+  }
+
+  /// Removes stale alert keys that are no longer active.
+  void _pruneAlerts(Set<String> activeKeys) {
+    _alertFirstSeen.removeWhere((key, _) => !activeKeys.contains(key));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2338,6 +2298,7 @@ class NotificationsScreen extends StatelessWidget {
 
                   final libraryData = Map<dynamic, dynamic>.from(librarySnapshot.data!.snapshot.value as Map);
                   List<Widget> activeAlerts = [];
+                  final Set<String> currentActiveKeys = {};
 
                   // 4. Logic to check for out-of-bounds metrics
                   userPlants.forEach((key, plantValue) {
@@ -2350,13 +2311,16 @@ class NotificationsScreen extends StatelessWidget {
                     if (libraryData.containsKey(plantKey)) {
                       final profile = Map<String, dynamic>.from(libraryData[plantKey] as Map);
 
-                      // Check Soil Moisture (The main request)
+                      // Check Soil Moisture
                       double currentMoisture = _asDouble(sensorData['soil_moisture_percent']);
                       double minMoisture = _asDouble(profile['ideal_soil_moisture_min']);
                       double maxMoisture = _asDouble(profile['ideal_soil_moisture_max']);
 
                       if (currentMoisture < minMoisture) {
-                        // Calculate water needed using your existing top-level function
+                        final alertKey = 'moisture_$key';
+                        currentActiveKeys.add(alertKey);
+                        final seenAt = _recordAlert(alertKey);
+
                         double targetMoisture = (minMoisture + maxMoisture) / 2;
                         double waterNeeded = _calculateWaterNeedMl(
                           targetMoisture: targetMoisture,
@@ -2370,24 +2334,31 @@ class NotificationsScreen extends StatelessWidget {
                           message: 'Moisture is below ideal range ($minMoisture%). Add ${waterNeeded.toStringAsFixed(0)} ml of water.',
                           icon: Icons.water_drop,
                           color: Colors.blue,
-                          time: 'Just now',
+                          time: _relativeTime(seenAt),
                         ));
                       }
 
-                      // Check Temp (Optional extra feature, just an example)
+                      // Check Temperature
                       double currentTemp = _asDouble(sensorData['air_temp_c']);
                       double maxTemp = _asDouble(profile['ideal_air_temp_max']);
                       if (currentTemp > maxTemp) {
+                        final alertKey = 'temp_$key';
+                        currentActiveKeys.add(alertKey);
+                        final seenAt = _recordAlert(alertKey);
+
                         activeAlerts.add(_buildAlertCard(
                           title: 'Temperature Warning: $plantName',
                           message: 'Air temperature (${currentTemp.toStringAsFixed(1)}°C) is too hot for this plant!',
                           icon: Icons.thermostat,
                           color: Colors.redAccent,
-                          time: 'Just now',
+                          time: _relativeTime(seenAt),
                         ));
                       }
                     }
                   });
+
+                  // Clean up keys for alerts that are no longer active
+                  _pruneAlerts(currentActiveKeys);
 
                   if (activeAlerts.isEmpty) {
                     return Center(
